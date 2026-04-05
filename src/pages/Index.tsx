@@ -68,8 +68,7 @@ export default function Index() {
     }
   };
 
-  const removeFile = (e: React.MouseEvent, idx: number) => {
-    e.stopPropagation();
+  const removeFile = (idx: number) => {
     setUploadedFiles((prev) => prev.map((f, i) => i === idx ? null : f));
   };
 
