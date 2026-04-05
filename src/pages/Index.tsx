@@ -39,31 +39,38 @@ const NAV_ITEMS = [
 
 export default function Index() {
   const [activeTab, setActiveTab] = useState("generate");
-  const [dragging, setDragging] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<(string | null)[]>([null, null, null, null]);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [selectedFormat, setSelectedFormat] = useState("GLTF");
   const [dims, setDims] = useState({ w: "", h: "", d: "" });
   const [selectedModel, setSelectedModel] = useState<number | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
-  const handleDrop = (e: React.DragEvent) => {
+  const SLOT_LABELS = ["Спереди", "Сзади", "Сбоку", "Сверху"];
+
+  const handleDrop = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
-    setDragging(false);
+    setDraggingSlot(null);
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) {
       const url = URL.createObjectURL(file);
-      setUploadedFile(url);
+      setUploadedFiles((prev) => prev.map((f, i) => i === idx ? url : f));
     }
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
-      setUploadedFile(url);
+      setUploadedFiles((prev) => prev.map((f, i) => i === idx ? url : f));
     }
+  };
+
+  const removeFile = (e: React.MouseEvent, idx: number) => {
+    e.stopPropagation();
+    setUploadedFiles((prev) => prev.map((f, i) => i === idx ? null : f));
   };
 
   const handleGenerate = () => {
@@ -138,58 +145,73 @@ export default function Index() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                {/* Upload zone */}
+                {/* Upload zone — 4 slots */}
                 <div className="lg:col-span-3">
-                  <label className="block text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">
-                    Исходное фото
-                  </label>
-                  <div
-                    onClick={() => fileRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={handleDrop}
-                    className={`relative aspect-video rounded border-2 border-dashed cursor-pointer transition-all duration-300 overflow-hidden
-                      ${dragging ? "border-primary bg-primary/5" : "border-border hover:border-border/60 hover:bg-secondary/30"}
-                    `}
-                    style={{
-                      backgroundImage: "repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(255,255,255,0.012) 10px,rgba(255,255,255,0.012) 20px)"
-                    }}
-                  >
-                    {uploadedFile ? (
-                      <>
-                        <img
-                          src={uploadedFile}
-                          alt="Загруженное фото"
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-background/60 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="text-xs font-mono text-foreground">Заменить фото</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                        <div className={`w-12 h-12 rounded border border-border flex items-center justify-center transition-colors ${dragging ? "border-primary bg-primary/10" : ""}`}>
-                          <Icon name="ImagePlus" size={20} className="text-muted-foreground" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-foreground/80">
-                            Перетащите фото или{" "}
-                            <span className="text-primary underline underline-offset-2">выберите файл</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1 font-mono">
-                            JPG, PNG, WEBP · до 20 МБ
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleFileInput}
-                    />
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                      Фото объекта
+                    </label>
+                    <span className="font-mono text-xs text-muted-foreground/50">
+                      {uploadedFiles.filter(Boolean).length} / 4
+                    </span>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { label: "Фронт", hint: "спереди" },
+                      { label: "Бок", hint: "сбоку" },
+                      { label: "Сверху", hint: "сверху" },
+                      { label: "Деталь", hint: "крупный план" },
+                    ] as const).map((slot, i) => (
+                      <div key={i} className="relative group">
+                        <div
+                          onClick={() => fileRefs[i].current?.click()}
+                          onDragOver={(e) => { e.preventDefault(); setDraggingSlot(i); }}
+                          onDragLeave={() => setDraggingSlot(null)}
+                          onDrop={(e) => handleDrop(e, i)}
+                          className={`relative aspect-square rounded border-2 border-dashed cursor-pointer transition-all duration-200 overflow-hidden
+                            ${draggingSlot === i ? "border-primary bg-primary/5" : uploadedFiles[i] ? "border-border/40" : "border-border hover:border-primary/40 hover:bg-secondary/20"}
+                          `}
+                        >
+                          {uploadedFiles[i] ? (
+                            <img
+                              src={uploadedFiles[i]!}
+                              alt={slot.label}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+                              <Icon name="ImagePlus" size={18} className={`transition-colors ${draggingSlot === i ? "text-primary" : "text-muted-foreground/50"}`} />
+                              <span className="text-[10px] font-mono text-muted-foreground/60 uppercase tracking-wider">{slot.label}</span>
+                              <span className="text-[9px] text-muted-foreground/30">{slot.hint}</span>
+                            </div>
+                          )}
+                          <input
+                            ref={fileRefs[i]}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleFileInput(e, i)}
+                          />
+                        </div>
+                        {uploadedFiles[i] && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                            className="absolute top-1 right-1 w-5 h-5 rounded bg-background/80 border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:border-destructive"
+                          >
+                            <Icon name="X" size={10} className="text-foreground" />
+                          </button>
+                        )}
+                        {uploadedFiles[i] && (
+                          <span className="absolute bottom-1 left-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-background/70 text-muted-foreground backdrop-blur-sm">
+                            {slot.label}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[10px] font-mono text-muted-foreground/40 text-center">
+                    Перетащите или кликните · JPG, PNG, WEBP · до 20 МБ каждое
+                  </p>
                 </div>
 
                 {/* Parameters */}
